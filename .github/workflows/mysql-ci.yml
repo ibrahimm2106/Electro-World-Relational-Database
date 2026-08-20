@@ -1,0 +1,55 @@
+name: MySQL CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  database-test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install MySQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
+
+      - name: Create schema
+        run: mysql -h 127.0.0.1 -uroot -proot < sql/01_schema.sql
+
+      - name: Insert sample data
+        run: mysql -h 127.0.0.1 -uroot -proot < sql/02_seed_data.sql
+
+      - name: Create views
+        run: mysql -h 127.0.0.1 -uroot -proot < sql/03_views.sql
+
+      - name: Run query showcase
+        run: mysql -h 127.0.0.1 -uroot -proot < sql/04_queries.sql
+
+      - name: Smoke-test record counts
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot -e "
+            USE electro_world;
+            SELECT COUNT(*) AS product_count FROM products;
+            SELECT COUNT(*) AS customer_count FROM customers;
+            SELECT COUNT(*) AS sales_count FROM sales;
+            SELECT COUNT(*) AS transaction_count FROM transactions;
+          "
